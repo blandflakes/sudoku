@@ -1,0 +1,8 @@
+This is a Constraint Satisfaction Sudoku Solver.
+Originally written in Ruby, I am adding Swing via JRuby to provide
+a GUI.
+
+The user will be able to generate a random sudoku, reset the current puzzle,
+load files, save puzzles, and ask the program to solve the current puzzle.
+
+http://www.brianjfults.com

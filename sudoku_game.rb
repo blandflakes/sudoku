@@ -300,7 +300,7 @@ class SudokuGUI < JFrame
   end
   
   def save_puzzle(file_path)
-    save(self.get_current_grid, file_path)
+    Puzzle.save(self.get_current_grid, file_path)
   end
   
   def solve_current

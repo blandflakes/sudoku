@@ -21,10 +21,11 @@ class GridLocation
 	def <=> (other)
 		return self.allowed_vals.size <=> other.allowed_vals.size
 	end
-	
 end
 
 class Puzzle
+
+    
 	def initialize(file_path)
 		#file should be a csv
 		@grid = open(file_path, 'r').readlines.map {|line| line.split(',').map {|str_val| str_val.to_i}}
@@ -51,15 +52,18 @@ class Puzzle
 	
 	def save(file_path)
         file = open(file_path, 'w')
-        @rows.each do |row|
-            row.each do |val|
-                file.print val.to_s
-                if val != row[-1]
+        n = @grid.size
+        n.times do |row|
+            n.times do |col|
+                val = @grid[row][col]
+                file.print val.to_s unless val == 0
+                if col != n - 1
                     file.print ','
                 end
             end
-            file.print '\n'
+            file.print "\n"
         end
+        file.close
 	end
 	
 	def blanks
@@ -82,54 +86,51 @@ class Puzzle
 		@blank_locations << GridLocation.new(x, y, @grid.size, @inner_grids[x / @divisor + @divisor * (y / @divisor)], @rows[y], @columns[x])
 	end
 	
-
-	
 	attr_reader :grid, :inner_grids, :rows, :columns, :blank_locations
 end
 
 def solve(puzzle, indent = 0)
     tabs = get_tabs(indent)
     if puzzle.blanks.size == 0
-	    puts "Puzzle solved!"
-	    return puzzle
+#        puts "Puzzle solved!"
+        return puzzle
     end
     most_constrained = puzzle.blanks.sort[0]
-    puts "#{tabs}#######################################################"
-    puts "#{tabs}Attempting to find a value for (#{most_constrained.x}, #{most_constrained.y})"
-    puts "#{tabs}Possible values: #{most_constrained.allowed_vals}"
+#    puts "#{tabs}#######################################################"
+#    puts "#{tabs}Attempting to find a value for (#{most_constrained.x}, #{most_constrained.y})"
+#    puts "#{tabs}Possible values: #{most_constrained.allowed_vals}"
     success = false
     most_constrained.allowed_vals.each do |val|
-	    puzzle.set_val(most_constrained.x, most_constrained.y, val)
-	    puts "#{tabs}Attempting value: #{val}"
-	    success = solve(puzzle, indent + 1)
-	    if success then break end
-	    puts "#{tabs}Recursive call with #{val} unsuccessful, unsetting."
-	    puzzle.unset_val(most_constrained.x, most_constrained.y, val)
+        puzzle.set_val(most_constrained.x, most_constrained.y, val)
+#        puts "#{tabs}Attempting value: #{val}"
+        success = solve(puzzle, indent + 1)
+        if success then break end
+#        puts "#{tabs}Recursive call with #{val} unsuccessful, unsetting."
+        puzzle.unset_val(most_constrained.x, most_constrained.y, val)
     end
     return success
 end
 
 def get_tabs(indent)
-	str = ""
-	1.upto(indent) do |index|
-		str += "\t"
-	end
-	return str
+    str = ""
+    1.upto(indent) do |index|
+	    str += "\t"
+    end
+    return str
 end
 
 def print_solution(puzzle)
-	puzzle.grid.each do |line|
-		line.each do |value|
-			print value
-			if value != line[-1]
-				print ','
-			else
-				print "\n"
-			end
-		end
-	end
+    puzzle.grid.each do |line|
+	    line.each do |value|
+		    print value
+		    if value != line[-1]
+			    print ','
+		    else
+			    print "\n"
+		    end
+	    end
+    end
 end
-
 
 end		
 #print_solution(solve(Puzzle.new('test_puzzle2.txt')))

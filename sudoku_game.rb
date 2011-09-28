@@ -14,6 +14,15 @@ include_class 'java.awt.Dimension'
 include_class 'javax.swing.UIManager'
 include_class 'javax.swing.JFileChooser'
 
+class Point
+    def initialize(x, y)
+        @x = x
+        @y = y
+    end
+    
+    attr_accessor :x, :y
+end
+
 class SudokuCell
     def initialize(value, color)
         @value = value
@@ -31,11 +40,29 @@ end
 
 class InputListener
     include KeyListener
+    def initialize(gui)
+        @gui = gui
+        @directions = {'w' => :up,
+            's' => :down,
+            'a' => :left,
+            'd' => :right
+            }
+    end
+    
     def keyTyped(event)
         if (event.getID == KeyEvent::KEY_TYPED)
             char = event.getKeyChar.chr
-           JOptionPane.showMessageDialog(nil, char)
+            case char
+            when 'w', 'a', 's', 'd'
+                @gui.move_box(@directions[char])
+            when '1', '2', '3', '4', '5', '6', '7', '8', '9'
+                @gui.enter_value(char.to_i)
+            else if char[0].ord == 127
+                    @gui.delete_current
+                end
+            end
         end
+        @gui.update
     end
     
     def keyReleased(event)
@@ -101,8 +128,12 @@ end
         
 class GridPanel < JPanel
     def initialize
-    @font = Font.new(nil, Font::PLAIN, 22)
+        @font = Font.new(nil, Font::PLAIN, 22)
+        @current_box = Point.new(0, 0);
+        
     end
+  
+    attr_accessor :current_box
     
     #cell_width is the starting point for all calcs
     #side_length is the width and height of the drawing panel
@@ -148,15 +179,25 @@ class GridPanel < JPanel
                 cell_start_y = outer_y + 2
                 3.times do |cell_row|
                     3.times do |cell_column|
-                        g.drawRect(cell_column * @cell_width + cell_start_x,
+                        if inner_row * 3 + cell_row == @current_box.y && 
+                            inner_column * 3 + cell_column == @current_box.x
+                            
+                            g.setColor(Color::ORANGE)
+                            draw_thick_rectangle(g, cell_column * @cell_width + cell_start_x,
                             cell_row * @cell_width + cell_start_y,
-                            @cell_width, @cell_width)
+                            @cell_width, @cell_width, 3)
+                            g.setColor(Color::BLACK)
+                        else
+                            g.drawRect(cell_column * @cell_width + cell_start_x,
+                                cell_row * @cell_width + cell_start_y,
+                                @cell_width, @cell_width)
+                        end
                     end
                 end                
             end
         end
         
-        #paint colors
+        #paint values entered
         x = y = nil
         9.times do |row|
             9.times do |col|
@@ -191,11 +232,11 @@ class SudokuGUI < JFrame
   end
   
   def init_color_map(puzzle)
-    n = puzzle.grid.size
+    n = puzzle.size
     map = Array.new(n) {|i| Array.new(n)}
     0.upto(n - 1) do |y_val|
         0.upto(n - 1) do |x_val|
-            map[y_val][x_val] = SudokuCell.new(puzzle.grid[y_val][x_val], 
+            map[y_val][x_val] = SudokuCell.new(puzzle[y_val][x_val], 
                 Color::BLACK)
         end
     end
@@ -208,33 +249,63 @@ class SudokuGUI < JFrame
   end
   
   def load_puzzle(file_path)
-    set_puzzle(Puzzle.new(file_path))
-    @color_map = init_color_map(@current_puzzle)
+    set_puzzle(Puzzle.get_grid(file_path))
   end
   
   def set_puzzle(new_puzzle)
     #TODO nullcheck
     @current_initial = new_puzzle
-    @current_puzzle = Marshal.load(Marshal.dump(@current_initial))
+    @color_map = init_color_map(@current_initial)
     #other default settings?
   end
   
-  def reset_puzzle
-    @current_puzzle = Marshal.load(Marshal.dump(@current_initial))
-    @color_map = init_color_map(@current_puzzle)
+  def enter_value(val)
+    pos = @draw_panel.current_box
+    if @current_initial[pos.y][pos.x] == 0
+        @color_map[pos.y][pos.x] = SudokuCell.new(val, Color::BLUE)
+    end
   end
+  
+  def delete_current
+    pos = @draw_panel.current_box
+    if @current_initial[pos.y][pos.x] == 0
+        @color_map[pos.y][pos.x] = SudokuCell.new(0, Color::BLACK)
+    end
+  end
+        
+  def reset_puzzle
+    @color_map = init_color_map(@current_initial)
+  end
+  
+  def move_box(direction)
+    case direction
+    when :left
+        @draw_panel.current_box.x -= 1 unless @draw_panel.current_box.x == 0
+    when :right
+        @draw_panel.current_box.x += 1 unless @draw_panel.current_box.x == 8
+    when :up
+        @draw_panel.current_box.y -= 1 unless @draw_panel.current_box.y == 0
+    when :down
+        @draw_panel.current_box.y += 1 unless @draw_panel.current_box.y == 8
+    end
+  end
+        
   
   def generate_puzzle(valid = false)
     self.set_puzzle(generate_new_puzzle(valid))
-    @color_map = init_color_map(@current_puzzle)
+  end
+  
+  def get_current_grid
+    @color_map.collect {|row| row.collect {|cell| cell.value}}
   end
   
   def save_puzzle(file_path)
-    @current_puzzle.save(file_path)
+    save(self.get_current_grid, file_path)
   end
   
   def solve_current
-    result = solve(@current_puzzle)
+  #TODO CHECK BEFORE ATTEMPTING TO SOLVE
+    result = solve(Puzzle.new(self.get_current_grid))
     if !result
       JOptionPane.showMessageDialog(nil, "No solution exists from this point!")
     else
@@ -301,7 +372,7 @@ class SudokuGUI < JFrame
     @draw_panel = GridPanel.new
     @draw_panel.set_sizes(CELL_SIDE, GUI_WIDTH)
     @draw_panel.setPreferredSize(Dimension.new(GUI_WIDTH, DRAW_HEIGHT))
-    @draw_panel.addKeyListener(InputListener.new)
+    @draw_panel.addKeyListener(InputListener.new(self))
     @draw_panel.color_map = @color_map
     @container.add(@puzzle_control_panel)
     @container.add(@draw_panel)
@@ -319,4 +390,4 @@ class SudokuGUI < JFrame
   end
 end
 
-SudokuGUI.new('Sudoku', Sudoku::Puzzle.new('test_puzzle.txt')).setVisible(true)
+SudokuGUI.new('Sudoku', Sudoku::Puzzle.get_grid('test_puzzle.txt')).setVisible(true)

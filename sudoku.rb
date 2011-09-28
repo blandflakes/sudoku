@@ -29,6 +29,22 @@ class Puzzle
         open(file_path, 'r').readlines.map {|line| line.split(',').map {|str_val| str_val.to_i}}
     end
     
+    def self.save(grid, file_path)
+        file = open(file_path, 'w')
+        n = grid.size
+        n.times do |row|
+            n.times do |col|
+                val = grid[row][col]
+                file.print val.to_s unless val == 0
+                if col != n - 1
+                    file.print ','
+                end
+            end
+            file.print "\n"
+        end
+        file.close
+    end
+    
 	def initialize(grid, file_path = nil)
 		#file should be a csv
 		if grid.empty?
@@ -111,21 +127,7 @@ def get_tabs(indent)
     return str
 end
 
-def save(grid, file_path)
-    file = open(file_path, 'w')
-    n = grid.size
-    n.times do |row|
-        n.times do |col|
-            val = grid[row][col]
-            file.print val.to_s unless val == 0
-            if col != n - 1
-                file.print ','
-            end
-        end
-        file.print "\n"
-    end
-    file.close
-end
+
 
 def print_solution(puzzle)
     puzzle.grid.each do |line|

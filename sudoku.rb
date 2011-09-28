@@ -25,10 +25,17 @@ end
 
 class Puzzle
 
+    def self.get_grid(file_path)
+        open(file_path, 'r').readlines.map {|line| line.split(',').map {|str_val| str_val.to_i}}
+    end
     
-	def initialize(file_path)
+	def initialize(grid, file_path = nil)
 		#file should be a csv
-		@grid = open(file_path, 'r').readlines.map {|line| line.split(',').map {|str_val| str_val.to_i}}
+		if grid.empty?
+		    @grid = get_grid(file_path)
+		else
+		    @grid = grid
+		end
 		n = @grid.size
 		@inner_grids = Array.new(n) {|index| (1..n).to_a}
 		@rows = Array.new(n) {|index| (1..n).to_a}
@@ -50,21 +57,6 @@ class Puzzle
 		end
 	end
 	
-	def save(file_path)
-        file = open(file_path, 'w')
-        n = @grid.size
-        n.times do |row|
-            n.times do |col|
-                val = @grid[row][col]
-                file.print val.to_s unless val == 0
-                if col != n - 1
-                    file.print ','
-                end
-            end
-            file.print "\n"
-        end
-        file.close
-	end
 	
 	def blanks
 		@blank_locations
@@ -117,6 +109,22 @@ def get_tabs(indent)
 	    str += "\t"
     end
     return str
+end
+
+def save(grid, file_path)
+    file = open(file_path, 'w')
+    n = grid.size
+    n.times do |row|
+        n.times do |col|
+            val = grid[row][col]
+            file.print val.to_s unless val == 0
+            if col != n - 1
+                file.print ','
+            end
+        end
+        file.print "\n"
+    end
+    file.close
 end
 
 def print_solution(puzzle)

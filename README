@@ -5,4 +5,31 @@ a GUI.
 The user will be able to generate a random sudoku, reset the current puzzle,
 load files, save puzzles, and ask the program to solve the current puzzle.
 
+To run:
+java -jar jruby.jar sudoku_game.rb
+
+Instructions: Move selection box with 'w' (up), 's' (down), 'a', left and 'd' right.  Enter new numbers or change
+entered numbers by typing a number.
+
+Buttons:
+-"Clear" wipes the entire puzzle from the grid, leaving a blank slate.  You can make custom puzzles
+from this point.
+-"Reset puzzle" removes all user-entered numbers, restoring the puzzle to its loaded state.
+-"Generate puzzle" creates a random, solvable puzzle and loads it to the board.
+-"Load puzzle" loads a csv formatted puzzle from a file.
+Should be in the format of:
+[1-9],[1-9],[1-9],[1-9],[1-9],[1-9],[1-9],[1-9],[1-9]
+.
+.
+.
+.
+.
+.
+.
+.
+[1-9],[1-9],[1-9],[1-9],[1-9],[1-9],[1-9],[1-9],[1-9]
+Where the [1-9] is ommitted for a blank space.
+-"Save puzzle" writes the current grid to a csv in the above format.
+-"Solve it!" uses the built-in CSP solver to produce a solution, if one exists.  Solved values will be green.
+-"Check it!" checks the current solution, highlighting conflicting numbers in red.
 http://www.brianjfults.com

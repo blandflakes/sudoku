@@ -1,6 +1,6 @@
 require 'java'
 load 'sudoku.rb'
-
+load 'util.rb'
 include_class 'java.awt.event.ActionListener'
 include_class 'java.awt.event.KeyListener'
 include_class 'java.awt.event.KeyEvent'
@@ -14,14 +14,7 @@ include_class 'java.awt.Dimension'
 include_class 'javax.swing.UIManager'
 include_class 'javax.swing.JFileChooser'
 
-class Point
-    def initialize(x, y)
-        @x = x
-        @y = y
-    end
-    
-    attr_accessor :x, :y
-end
+
 
 class SudokuCell
     def initialize(value, color)
@@ -69,6 +62,13 @@ class InputListener
     end
     
     def keyPressed(event)
+    end
+end
+
+class ClearAction < GUIActionListener
+    def actionPerformed(event)
+        @gui.clear_puzzle
+        @gui.update
     end
 end
 
@@ -127,10 +127,11 @@ end
     
         
 class GridPanel < JPanel
+    include Util
     def initialize
+        super
         @font = Font.new(nil, Font::PLAIN, 22)
         @current_box = Point.new(0, 0);
-        
     end
   
     attr_accessor :current_box
@@ -158,6 +159,7 @@ class GridPanel < JPanel
     end
     
     def paintComponent(g)
+        super(g)
         g.setFont(@font)
         #paint largest rectangle - have to paint first white rectangle because
         #playing with the background yielded nothing - how the fuck
@@ -217,10 +219,10 @@ class SudokuGUI < JFrame
     include Sudoku
     CELL_SIDE = 60
     GUI_WIDTH = 630
-    PUZZLE_PANEL_HEIGHT = 30
-    SOLUTION_PANEL_HEIGHT = 30
+    PUZZLE_PANEL_HEIGHT = 35
+    SOLUTION_PANEL_HEIGHT = 35
     DRAW_HEIGHT = GUI_WIDTH
-    GUI_HEIGHT = DRAW_HEIGHT + PUZZLE_PANEL_HEIGHT + SOLUTION_PANEL_HEIGHT + 20
+    GUI_HEIGHT = DRAW_HEIGHT + PUZZLE_PANEL_HEIGHT + SOLUTION_PANEL_HEIGHT + 30
     
   def initialize(title, puzzle = nil)
     super(title)
@@ -228,6 +230,7 @@ class SudokuGUI < JFrame
       self.set_puzzle(puzzle)
     end
     @color_map = init_color_map(puzzle)
+    @n = 9
     init_components
   end
   
@@ -253,10 +256,8 @@ class SudokuGUI < JFrame
   end
   
   def set_puzzle(new_puzzle)
-    #TODO nullcheck
     @current_initial = new_puzzle
     @color_map = init_color_map(@current_initial)
-    #other default settings?
   end
   
   def enter_value(val)
@@ -290,9 +291,13 @@ class SudokuGUI < JFrame
     end
   end
         
+  def clear_puzzle
+      map = Array.new(@n) {|i| Array.new(@n)}
+      set_puzzle(map)
+  end
   
   def generate_puzzle(valid = false)
-    self.set_puzzle(generate_new_puzzle(valid))
+    self.set_puzzle(generate_puzzle_grid(@n, valid))
   end
   
   def get_current_grid
@@ -304,7 +309,10 @@ class SudokuGUI < JFrame
   end
   
   def solve_current
-  #TODO CHECK BEFORE ATTEMPTING TO SOLVE
+    check_result = check_entries
+    if !check_result[:discrepencies].empty?
+        return
+    end
     result = solve(Puzzle.new(self.get_current_grid))
     if !result
       JOptionPane.showMessageDialog(nil, "No solution exists from this point!")
@@ -326,13 +334,25 @@ class SudokuGUI < JFrame
   end                
             
   def check_entries
-    #get discrepancies
-    #color each offending item
+    result = Puzzle.check(self.get_current_grid)
+    
+    if result[:win]
+        JOptionPane.showMessageDialog(nil, "You win!")
+    else
+        result[:discrepencies].each do |location|
+            if @color_map[location.y][location.x].color == Color::BLUE
+                @color_map[location.y][location.x].color = Color::RED
+            end
+        end
+    end
+    return result
   end
   
   def init_components
     
     #create buttons, listeners
+    clear_button = JButton.new('Clear')
+    clear_button.addActionListener(ClearAction.new(self))
     reset_button = JButton.new('Reset puzzle')
     reset_button.addActionListener(ResetAction.new(self))
     gen_button = JButton.new('Generate puzzle')
@@ -355,6 +375,7 @@ class SudokuGUI < JFrame
     @puzzle_control_panel.setPreferredSize(Dimension.new(GUI_WIDTH, PUZZLE_PANEL_HEIGHT))
 
     #add buttons to puzzle control panel
+    @puzzle_control_panel.add(clear_button)
     @puzzle_control_panel.add(reset_button)
     @puzzle_control_panel.add(gen_button)
     @puzzle_control_panel.add(load_button)
@@ -384,7 +405,7 @@ class SudokuGUI < JFrame
     pack
 
     self.setDefaultCloseOperation(JFrame::EXIT_ON_CLOSE)
-    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+    #UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
     @draw_panel.setFocusable(true)
     @draw_panel.requestFocus
   end

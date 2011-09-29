@@ -15,7 +15,7 @@ include_class 'javax.swing.UIManager'
 include_class 'javax.swing.JFileChooser'
 
 
-
+#Represents a cell containing a value in the Sudoku GUI
 class SudokuCell
     def initialize(value, color)
         @value = value
@@ -24,6 +24,7 @@ class SudokuCell
     attr_accessor :value, :color
 end
 
+#All the action listeners get a reference to the GUI callback
 class GUIActionListener
     include ActionListener
     def initialize(gui)
@@ -31,6 +32,7 @@ class GUIActionListener
     end
 end
 
+#Listens for keystrokes on the drawing panel, moves box (or deletes values) as appropriate
 class InputListener
     include KeyListener
     def initialize(gui)
@@ -125,7 +127,8 @@ class CheckAction < GUIActionListener
     end
 end
     
-        
+#The panel for drawing the grid.
+#Handles grid outline, writing and coloring of values, selection box
 class GridPanel < JPanel
     include Util
     def initialize
@@ -134,6 +137,7 @@ class GridPanel < JPanel
         @current_box = Point.new(0, 0);
     end
   
+    #listeners/gui will update this as it changes
     attr_accessor :current_box
     
     #cell_width is the starting point for all calcs
@@ -148,12 +152,16 @@ class GridPanel < JPanel
         #puts "cw: #{@cell_width}, inner_in: #{@inner_grid_inside}, inner_out: #{@inner_grid_outer}, @grid_side: #{@grid_side}, buffer: #{@buffer}"
     end
     
+    #draws a rectangle with width greater than 1 - g is the page to draw on, x and y are top left corner,
+    #width is outside width and height is outside height.
+    #thickness: number of rectangles thick to draw it
     def draw_thick_rectangle(g, x, y, width, height, thickness)
         thickness.times do |level|
             g.drawRect(x + level, y + level, width - 2 * level, height - 2 * level)
         end
     end
     
+    #color_map is a grid of SudokuCells that are read when filling the grid
     def color_map= (map)
         @color_map = map
     end
@@ -162,8 +170,8 @@ class GridPanel < JPanel
         super(g)
         g.setFont(@font)
         #paint largest rectangle - have to paint first white rectangle because
-        #playing with the background yielded nothing - how the fuck
-        #is my super class nil if I extend JPanel?
+        #playing with the background yielded nothing - how
+        #is my super class nil if I extend JPanel?  Got that working, but I probably don't need to change this.
         g.setColor(Color::WHITE)
         g.fillRect(@buffer, @buffer, @grid_side, @grid_side)
         g.setColor(Color::BLACK)
@@ -173,17 +181,18 @@ class GridPanel < JPanel
         #paint 9 inner grids, 3 squares for each one for a thick line
         3.times do |inner_row|
             3.times do |inner_column|
+                #outer_[x|y] is the top left corner of each inner grid
                 outer_x = @buffer + inner_column * @inner_grid_length
                 outer_y = @buffer + inner_row * @inner_grid_length
                 draw_thick_rectangle(g, outer_x, outer_y, @inner_grid_length,
                     @inner_grid_length, 3)
+                #cell_start[x|y] is top left of each inner grid that can have cells drawn at (starting point for cells)
                 cell_start_x = outer_x + 2
                 cell_start_y = outer_y + 2
                 3.times do |cell_row|
                     3.times do |cell_column|
-                        if inner_row * 3 + cell_row == @current_box.y && 
-                            inner_column * 3 + cell_column == @current_box.x
-                            
+                        #check to paint current_box over cell instead of black square.  I could write it over after, but I wasn't smart enough to get the coordinates right.
+                        if inner_row * 3 + cell_row == @current_box.y && inner_column * 3 + cell_column == @current_box.x
                             g.setColor(Color::ORANGE)
                             draw_thick_rectangle(g, cell_column * @cell_width + cell_start_x,
                             cell_row * @cell_width + cell_start_y,
@@ -215,6 +224,7 @@ class GridPanel < JPanel
     end
 end
 
+#Actual GUI class.  Contains methods for manipulating GUI items, calls Sudoku methods to perform work on puzzle.
 class SudokuGUI < JFrame
     include Sudoku
     CELL_SIDE = 60
@@ -224,7 +234,7 @@ class SudokuGUI < JFrame
     DRAW_HEIGHT = GUI_WIDTH
     GUI_HEIGHT = DRAW_HEIGHT + PUZZLE_PANEL_HEIGHT + SOLUTION_PANEL_HEIGHT + 30
     
-  def initialize(title, puzzle = nil)
+  def initialize(title, puzzle = Array.new(@n) {|i| Array.new(@n)})
     super(title)
     if (puzzle)
       self.set_puzzle(puzzle)
@@ -234,6 +244,7 @@ class SudokuGUI < JFrame
     init_components
   end
   
+  #sets up a new color_map assuming puzzle is the initial state.  All given values are black.
   def init_color_map(puzzle)
     n = puzzle.size
     map = Array.new(n) {|i| Array.new(n)}
@@ -245,21 +256,25 @@ class SudokuGUI < JFrame
     end
     return map
   end
-     
+
+  #method for redrawing the GUI - updates the grid state and asks the draw panel to repaint
   def update
     @draw_panel.color_map = @color_map
     @draw_panel.repaint
   end
   
+  #updates current puzzle to the grid located at file_path.  Could blow up - there's really no checking done here.
   def load_puzzle(file_path)
     set_puzzle(Puzzle.get_grid(file_path))
   end
   
+  #updates the starting state puzzle to the new puzzle and resets the color map
   def set_puzzle(new_puzzle)
     @current_initial = new_puzzle
     @color_map = init_color_map(@current_initial)
   end
   
+  #when the user enters a number, updates the color_map (if the number isn't part of the initial state)
   def enter_value(val)
     pos = @draw_panel.current_box
     if @current_initial[pos.y][pos.x] == 0
@@ -267,17 +282,20 @@ class SudokuGUI < JFrame
     end
   end
   
+  #deletes the value in the selected cell (if the number isn't part of the initial state)
   def delete_current
     pos = @draw_panel.current_box
     if @current_initial[pos.y][pos.x] == 0
         @color_map[pos.y][pos.x] = SudokuCell.new(0, Color::BLACK)
     end
   end
-        
+
+  #clears all user entered values, restoring initial state of the puzzle
   def reset_puzzle
     @color_map = init_color_map(@current_initial)
   end
   
+  #changes the selected cell.
   def move_box(direction)
     case direction
     when :left
@@ -290,24 +308,29 @@ class SudokuGUI < JFrame
         @draw_panel.current_box.y += 1 unless @draw_panel.current_box.y == 8
     end
   end
-        
+
+  #wipes all values from the grid, leaving an empty sudoku
   def clear_puzzle
       map = Array.new(@n) {|i| Array.new(@n)}
       set_puzzle(map)
   end
   
+  #generates a puzzle randomly.  puzzle is guaranteed to have at least 1 solution.
   def generate_puzzle(valid = false)
     self.set_puzzle(generate_puzzle_grid(@n, valid))
   end
   
+  #collects the 2d array of values from the color map
   def get_current_grid
     @color_map.collect {|row| row.collect {|cell| cell.value}}
   end
   
+  #writes the current puzzle to a file
   def save_puzzle(file_path)
     Puzzle.save(self.get_current_grid, file_path)
   end
   
+  #checks that the current puzzle has no conflicts, then attempts to solve it, displaying results in green.
   def solve_current
     check_result = check_entries
     if !check_result[:discrepencies].empty?
@@ -322,6 +345,7 @@ class SudokuGUI < JFrame
     end
   end
   
+  #Finds any new values in "new" and updates them with color in color_map.
   def color_differences(color_map, new, color)
     n = color_map.size
     n.times do |row|
@@ -332,7 +356,8 @@ class SudokuGUI < JFrame
         end
     end
   end                
-            
+
+  #checks for invalid entries (two or more of the same value in a given grid, row, or column.  Discrepencies are set to red.  Returns Hashmap of results (:win -> bool, :discrepencies -> errors, :gaps-> any gaps exist?)
   def check_entries
     result = Puzzle.check(self.get_current_grid)
     
@@ -348,8 +373,8 @@ class SudokuGUI < JFrame
     return result
   end
   
+  #initializes layout and components of the GUI
   def init_components
-    
     #create buttons, listeners
     clear_button = JButton.new('Clear')
     clear_button.addActionListener(ClearAction.new(self))

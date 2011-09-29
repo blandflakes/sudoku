@@ -2,6 +2,9 @@ module Sudoku
 load 'util.rb'
 include Util
 require 'set'
+
+#contains information about a cell in the grid.  Knows which values are still available based on references to the containing
+#row, column, and inner grid.
 class GridLocation
     def initialize(x, y, n, grid, row, column)
         @x = x
@@ -21,17 +24,56 @@ class GridLocation
         @grid & @column & @row
     end
     
+    #to allow for sorting on most constrained cells, a cell is bigger if it has more allowed_vals, and therefore less constrained
     def <=> (other)
         return self.allowed_vals.size <=> other.allowed_vals.size
     end
 end
 
+#Represents logic for a sudoku puzzle.  Has methods to check for errors, solve a puzle, save/load a puzzle, and generate a puzzle
 class Puzzle
     include Util
+    
+    #can be built from either a file_path or a provided 2d grid
+    def initialize(grid, file_path = nil)
+        #file should be a csv
+        if grid.empty?
+            @grid = get_grid(file_path)
+        else
+            @grid = grid
+        end
+        n = @grid.size
+        
+        #lists of available values in each related container to a cell
+        @inner_grids = Array.new(n) {|index| (1..n).to_a}
+        @rows = Array.new(n) {|index| (1..n).to_a}
+        @columns = Array.new(n) {|index| (1..n).to_a}
+        
+        @blank_locations = Array.new
+        to_reject = nil
+        @divisor = Math.sqrt(n).to_i
+        
+        0.upto(n - 1) do |y_val|
+            0.upto(n - 1) do |x_val|
+                to_reject = @grid[y_val][x_val]
+                if to_reject != 0 then
+                    @inner_grids[x_val / @divisor + @divisor * (y_val / @divisor)].delete(to_reject)
+                    @rows[y_val].delete(to_reject)
+                    @columns[x_val].delete(to_reject)
+                else
+                    #keep track of blank_locations to be filled
+                    @blank_locations << GridLocation.new(x_val, y_val, n, @inner_grids[x_val / @divisor + @divisor * (y_val / @divisor)], @rows[y_val], @columns[x_val])
+                end
+            end
+        end
+    end
+    
+    #parses a 2d grid from the provided csv
     def self.get_grid(file_path)
         open(file_path, 'r').readlines.map {|line| line.split(',').map {|str_val| str_val.to_i}}
     end
     
+    #saves the provided 2d grid as a csv
     def self.save(grid, file_path)
         file = open(file_path, 'w')
         n = grid.size
@@ -48,9 +90,12 @@ class Puzzle
         file.close
     end
     
+    #checks a 2d grid for conflicting values
     def self.check(grid)
+        #want a set because there's no point in pointing out redundant pairs (except there is a point in pointing)
         discrepencies = Set.new
         n = grid.size
+        #look familiar? building hashes of points - if a value is in the list, we know where the conflicting point(s) are.
         divisor = Math.sqrt(n).to_i
         inner_grids= Array.new(n) {|i|Hash.new}
         rows = Array.new(n) {|i|Hash.new}
@@ -94,41 +139,12 @@ class Puzzle
             :gaps => gap_exists,
             :win => (!gap_exists and discrepencies.empty?)}
     end
-    
-    
-    def initialize(grid, file_path = nil)
-        #file should be a csv
-        if grid.empty?
-            @grid = get_grid(file_path)
-        else
-            @grid = grid
-        end
-        n = @grid.size
-        @inner_grids = Array.new(n) {|index| (1..n).to_a}
-        @rows = Array.new(n) {|index| (1..n).to_a}
-        @columns = Array.new(n) {|index| (1..n).to_a}
-        @blank_locations = Array.new
-        to_reject = nil
-        @divisor = Math.sqrt(n).to_i
-        0.upto(n - 1) do |y_val|
-            0.upto(n - 1) do |x_val|
-                to_reject = @grid[y_val][x_val]
-                if to_reject != 0 then
-                    @inner_grids[x_val / @divisor + @divisor * (y_val / @divisor)].delete(to_reject)
-                    @rows[y_val].delete(to_reject)
-                    @columns[x_val].delete(to_reject)
-                else
-                    @blank_locations << GridLocation.new(x_val, y_val, n, @inner_grids[x_val / @divisor + @divisor * (y_val / @divisor)], @rows[y_val], @columns[x_val])
-                end
-            end
-        end
-    end
-    
-    
+
     def blanks
         @blank_locations
     end
 
+    #sets a value of a blank location.  Removes the value from possibilities of containing grid, row, and column
     def set_val(x, y, val)
         @grid[y][x] = val
         @inner_grids[x / @divisor + @divisor * (y / @divisor)].delete(val)
@@ -137,6 +153,7 @@ class Puzzle
         @blank_locations.reject! {|blank| blank.x == x and blank.y == y}
     end
     
+    #when the solve algorithm backtracks, add a value back to a blank location and to the possibilities for the inner grid, row, and column
     def unset_val(x, y, val)
         @grid[y][x] = 0
         @inner_grids[x / @divisor + @divisor * (y / @divisor)] << val
@@ -148,6 +165,9 @@ class Puzzle
     attr_reader :grid, :inner_grids, :rows, :columns, :blank_locations
 end
 
+#creates a randomized puzzle of nxn.  currently, valid means nothing.
+#creates between 25 and 34 random numbers on a grid.  Makes sure conflicts aren't introduced.
+#checks that the puzzle is solvable before returning.
 def generate_puzzle_grid(n, valid)
     used = []
     grid =  Array.new(n) {|i| Array.new(n, 0)}
